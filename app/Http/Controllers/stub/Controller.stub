@@ -1,0 +1,32 @@
+<?php
+
+
+namespace App\Http\Controllers__PATH__;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use \__MODEL_NAME__;
+
+class __CONTROLLER_NAME__Controller extends Controller
+{
+   	
+    public function index() {
+
+    }
+
+    public function save(Request $request){
+    	$response["status"] = "200";
+    	$response["data"] = "data";
+    	$limit = $request->input("limit") ? : 20;
+    	$page = $request->input("page") ? : 1;
+    	___VARS___
+    	$model = __MODEL_NAME__::where(__ID__, "!=", "");
+    	
+    	$totalRecord = $model->count();
+
+    	__MODEL_FILTER__
+
+
+
+    }
+}
