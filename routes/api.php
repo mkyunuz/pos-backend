@@ -79,4 +79,54 @@ Route::middleware('auth:api')->group(function(){
 		// Route::get("/check-id", "ProductsController@checkProductId");
 		// Route::get("/check-barcode", "ProductsController@checkBarcode");
 	});
+	Route::prefix("journal")->group(function(){
+		Route::post("/", "JournalController@index");
+	});
+	Route::prefix("ledger")->group(function(){
+		Route::post("/", "LedgerController@index");
+	});
+	Route::prefix("equility")->group(function(){
+		Route::post("/", "EquilityController@index");
+		Route::post("/save", "EquilityController@save");
+	});
+	Route::prefix("liabilities")->group(function(){
+		Route::post("/", "LiabilitiesController@index");
+		Route::post("/save", "LiabilitiesController@save");
+	});
+	Route::prefix("customers")->group(function(){
+		Route::post("/", "CustomerController@index");
+		Route::post("/save", "CustomerController@save");
+		Route::post("/delete", "CustomerController@delete");
+	});
+	Route::prefix("pos")->group(function(){
+		Route::get("/transaction-number", "PosController@transactionNumber");
+		Route::get("/products", "PosController@products");
+		Route::post("/save", "PosController@save");
+		Route::post("/hold", "PosController@hold");
+		Route::get("/summary", "PosController@summary");
+		Route::get("/pending-transaction", "PosController@pendingTransaction");
+		Route::post("/transaction-list", "PosController@index");
+		Route::get("/receipt-of-payment", "PosController@receiptOfPayment");
+		Route::post("/save-return", "PosController@saveReturn");
+	});
+	Route::prefix("ar")->group(function(){
+		Route::post("/", "AccountReceivableController@index");
+		Route::post("/save-payment", "AccountReceivableController@save");
+	});
+	Route::prefix("users")->group(function(){
+		Route::post("/", "UserController@index");
+		Route::post("/save", "UserController@save");
+		Route::get("/check-email", "UserController@checkEmail");
+		Route::post("/view", "UserController@view");
+		Route::get("/info", "UserController@info");
+	});
+	Route::prefix("roles")->group(function(){
+		Route::get("/", "RoleController@index");
+	});
+	Route::prefix("dashboard")->group(function(){
+		Route::get("/omzet", "DashboardController@omzet");
+		Route::get("/hpp", "DashboardController@hpp");
+		Route::get("/monthly-sales", "DashboardController@monthlySales");
+		Route::get("/summary-sales", "DashboardController@summarySales");
+	});
 });

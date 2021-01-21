@@ -8,9 +8,11 @@ use Illuminate\Support\Facades\Log;
 use App\Suppliers;
 use App\Users;
 use App\Units;
+use App\Products;
 use App\Warehouses;
 use App\Models\PurchaseDetail;
 use App\Models\PaymentHistory;
+use App\Models\Liabilities;
 
 class Purchase extends Model
 {
@@ -35,12 +37,11 @@ class Purchase extends Model
     	"due_date",
     	"close",
     ];
+    
     public static function rules($request){
 	    $rules = [
 	    	"purchase_number" => "required",
 	    	"warehouses" => "required",
-	    	// "warehouse_address" => "required",
-	    	// "contact_person" => "required",
 	    	"supplier" => "required",
 	    	"grand_total" => "required",
 	    	"total_ppn" => "required",
@@ -62,7 +63,14 @@ class Purchase extends Model
     public function payments(){
     	return $this->morphMany(PaymentHistory::class, "payment");
     }
+    public function _liabilities(){
+    	return $this->morphOne(Liabilities::class, "liabilities");
+    }
     
+    public function stockcard(){
+        return $this->morphToMany(StockCard::class, "stockable");
+    }
+
     public function saveOrders(
     	$purchase_id,
     	$detail_id = [], 
@@ -96,7 +104,7 @@ class Purchase extends Model
     		if($detail_id[$key] == "undefined" || !$detail_id[$key]){
 	    		$saveOrders[] = [
 	    			"purchase_id" => $purchase_id,
-	    			"product_code" => $value,
+	    			"product_id" => Products::where(DB::raw("SHA1(id)"), $value)->get()->first()->id,
 	    			"qty" => $qtys[$key],
 	    			"price" => $prices[$key],
 	    			"unit_id" => Units::where(DB::raw("SHA1(id)"), $units[$key])->get()->first()->id,
@@ -111,5 +119,6 @@ class Purchase extends Model
     }
     public function user(){
         return $this->hasOne(Users::class, "user_id", "id");
-    }    
+    }  
+
 }

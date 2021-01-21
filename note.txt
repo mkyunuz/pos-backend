@@ -6,3 +6,9 @@ Qty
 Supplier
 
 Pembayaran
+
+
+
+
+Pending
+Update warehouse di produk

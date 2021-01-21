@@ -12,7 +12,7 @@ class PurchaseDetail extends Model
     protected $table="purchase_detail";
     protected $fillable = [
     	"purchase_id", 
-    	"product_code", 
+    	"product_id", 
         "qty", 
         "price",
         "unit_id", 
@@ -30,10 +30,10 @@ class PurchaseDetail extends Model
         return $this->hasOne(PurchaseOrder::class, "unit_id", "id");
     }
     public function product(){
-        return $this->belongsTo(Products::class, "product_code", "product_code");
+        return $this->belongsTo(Products::class, "product_id", "id");
     }
     public function user(){
         return $this->hasOne(Users::class, "user_id", "id");
     }
-
+    
 }

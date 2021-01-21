@@ -17,24 +17,24 @@ use App\Models\PurchaseOrderDetail;
 use App\Repositories\PoRepo;
 class PoController extends Controller
 {
-	    	
+	private $response;
+	public function __construct(){
+		$this->response = AppHelpers::getInstance();
+	}
 	public function getPoNumber(Request $request){
-		$response["error_code"] = "000";
-		$response["error_message"] = "OK";
-		$response["payload"] = null;
+		$payload = null;
 		try {
 			$po_number = PoRepo::generatePoNumber();
-			$response["payload"] = $po_number;
+			$payload = $po_number;
 		} catch (\Exception $e) {
 			return AppHelpers::error($e, 500);
 		}
 
-		return $response;
+		return $this->response->json($payload, 200);
 	}
 
 	public function index(Request $request){
-		$response["error_code"] = "000";
-		$response["error_message"] = "ok";
+		$payload = null;
 		$limit = $request->limit ?? 100;
 		$page = (int) $request->page ?? 1;
 		$query = ($request->input("query")) ? (array) $request->input("query") : [];
@@ -49,30 +49,25 @@ class PoController extends Controller
     	try {
 	    	$products = PoRepo::filter($search, $query, $sort, $limit, $offset, $no_pagination);
             $totalPage = ceil($products["totalRecords"] / $limit);
-	    	$response["payload"] = [];
+	    	$payload = [];
             $totalPage = ceil($products["totalRecords"] / $limit);
-            $response["payload"]["rows"] = [];
+            $payload["rows"] = [];
             if($no_pagination == true){
-	            $response["payload"]["pagination"]["pageSize"] = $limit;
-	            $response["payload"]["pagination"]["total"] = $totalPage;
-	            $response["payload"]["pagination"]["current"] = $page;
-	            $response["payload"]["pagination"]["totalRecords"] = $products["totalRecords"];
+	            $payload["pagination"]["pageSize"] = $limit;
+	            $payload["pagination"]["total"] = $totalPage;
+	            $payload["pagination"]["current"] = $page;
+	            $payload["pagination"]["totalRecords"] = $products["totalRecords"];
             }
-            $response["payload"]["rows"] = $products["data"];
+            $payload["rows"] = $products["data"];
 
     	} catch (\Exception $e) {
-            $response["payload"]["rows"] = [];
-            $response["payload"]["pagination"] = [];
-            $response["message"] = $e->getMessage()." ".$e->getLine(). "".$e->getFile();
+            return AppHelpers::error($e, 500);
     	}
 
-		return response()->json($response, 200)->withHeaders([
-            'Content-Type' => "application/json",
-        ]);
+		return $this->response->json($payload, 200);
 	}
 	public function save(Request $request){
-    	$response["error_code"] = "000";
-    	$response["error_message"] = "ok";
+    	$payload = null;
     	$status = 200;
 		$validator = Validator::make($request->all(), PurchaseOrder::rules($request));
 		if($validator->fails()){
@@ -148,30 +143,24 @@ class PoController extends Controller
 				$po = PurchaseOrder::find($poId);
 				$po->saveOrders($poId, $detail_id, $product_codes, $qtys, $prices, $units, $discount, $subtotals, $ppn, auth()->user()->id, explode(",", $remove_products));
 			}
-			$response["payload"] = sha1($poId);
+			$payload = sha1($poId);
 			DB::commit();
 		} catch (\Exception $e) {
 			DB::rollBack();
 			return AppHelpers::error($e, 500);
 		}
-		return response()->json($response, $status)->withHeaders([
-            'Content-Type' => "application/json",
-        ]);
-		// $Warehouses =
+		return $this->response->json($payload, 200);
 	}
 
 	public function view(Request $request){
-		$response["error_code"] = "000";
-    	$response["error_message"] = "ok";
+		$payload = null;
 		try{
 			$model = PoRepo::findByIdEncrypted($request->key);
-    		$response["payload"] = $model;
+    		$payload = $model;
 		} catch(\Exception $e){
 			return AppHelpers::error($e, 500);
 		}
-		return response()->json($response, 200)->withHeaders([
-            'Content-Type' => "application/json",
-        ]);
+		return $this->response->json($payload, 200);
 	}
 
 }

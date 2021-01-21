@@ -15,7 +15,7 @@ use App\Units;
 use App\Warehouses;
 use App\Models\PurchaseDetail;
 use App\Repositories\PurchaseRepo;
-use App\Models\JournalEntries;
+use App\Products;
 class PurchaseController extends Controller
 {
 	    	
@@ -31,21 +31,6 @@ class PurchaseController extends Controller
 		}
 
 		return $response;
-	}
-	public function journal(Request $request){
-		$model = JournalEntries::all();
-		return $model->map(function($data) {
-			return [
-				"date" => $data->transaction_date,
-				"details" => $data->details->map(function($data){
-					return [
-						"account" => $data->account->name,
-						"amount" => $data->amount,
-						"entry_type" => $data->entry_type
-					];
-				})
-			];
-		});
 	}
 	public function index(Request $request){
 		$response["error_code"] = "000";
@@ -97,7 +82,7 @@ class PurchaseController extends Controller
 		} 
 
 		$key = $request->key ?? null;
-		$product_codes = $request->product_code ?? [];
+		$product_ids = $request->product_id ?? [];
 		$units = $request->units ?? [];
 		$qtys = $request->qtys ?? [];
 		$prices = $request->prices ?? [];
@@ -110,7 +95,7 @@ class PurchaseController extends Controller
 		$supplier = Suppliers::where(DB::raw("SHA1(id)"), $request->supplier)->get()->first();
 		$warehouse = Warehouses::where(DB::raw("SHA1(id)"), $request->warehouses)->get()->first();
 		$warehouse_id = $warehouse->id;
-		// return $warehouse_id;
+		// return $product_ids;
 		DB::beginTransaction();
 		$due_date = "";
 		$payment_date = NULL;
@@ -123,14 +108,15 @@ class PurchaseController extends Controller
 				$gt_after_ppn = $request->grand_total + $request->total_ppn;
 				$balance = $gt_after_ppn - $paid_amount;
 				$close = ($balance <= 0) ? 1 : 0;
+				$update_stock = $request->update_stock;
 				$model = Purchase::create([
 					"purchase_number" => $request->purchase_number ?? NULL, 
 					"po_number" => $request->po_number ?? NULL, 
 					"supplier_id" => $supplier->id, 
 					"payment_method" => $request->payment_method, 
-					"due_date" => ($due_date) ? $due_date : NULL, 
+					"due_date" => ($due_date) ? $due_date : $request->payment_date, 
 					"shipping_costs" => 0, 
-					"transaction_date" => date("Y-m-d"),
+					"transaction_date" => $request->payment_date,
 					"remark" => NULL,
 					"company" => $supplier->company,
 					"warehouse_id" => $warehouse_id,
@@ -143,50 +129,26 @@ class PurchaseController extends Controller
 					"gt_after_ppn" => $gt_after_ppn,
 					"close" => $close,
 				]);
+				$purchase = $model;
 				$poId = $model->id;
-				// $purchase = Purchase::find($model->id);
 				if($paid_amount){
-					
-					$payment = $model->payments()->create(["amount" => $paid_amount, "user_id" => auth()->user()->id, "balance" => $balance, "payment_date" => $payment_date]);
-					
-					$journal = $payment->journals()->create([
-						"transaction_id" => date("Ymdhis"),
+					$hisory = $model->payments()->create(["amount" => $paid_amount, "user_id" => auth()->user()->id, "balance" => $balance, "payment_date" => $payment_date]);
+				}else{
+					$hisory = $model;
+				}
+				if($balance > 0){
+					$purchase->_liabilities()->create([
+						"description" => "Hutang pembelian (".$request->purchase_number.")",
+						"amount" => $balance,
 						"transaction_date" => $payment_date,
 						"user_id" => auth()->user()->id,
 					]);
-					$journalId = $journal->id;
-					$journal->details()->create([
-						"journal_id" => $journalId,
-						"account_id" => 5,
-						"entry_type" => "D",
-						"amount" => $gt_after_ppn,
-					]);
-					if($request->payment_method == "cash"){
-						$account_id = 1;
-						$journal->details()->create([
-							"journal_id" => $journalId,
-							"account_id" => 1,
-							"entry_type" => "C",
-							"amount" => $gt_after_ppn,
-						]);
-
-					}else{
-						$account_id = 6;
-						$journal->details()->create([
-							"journal_id" => $journalId,
-							"account_id" => 1,
-							"entry_type" => "C",
-							"amount" => $paid_amount,
-						]);
-						$journal->details()->create([
-							"journal_id" => $journalId,
-							"account_id" => 6,
-							"entry_type" => "K",
-							"amount" => $balance,
-						]);
-					}
 				}
-				$model->saveOrders($model->id, $detail_id, $product_codes, $qtys, $prices, $units, $discount, $subtotals, $ppn, auth()->user()->id);
+				$model->saveOrders($model->id, $detail_id, $product_ids, $qtys, $prices, $units, $discount, $subtotals, $ppn, auth()->user()->id);
+				if($update_stock){
+					$_product = new Products();
+					$_product->updateStock($product_ids, $units, $qtys, $warehouse_id, $payment_date, date("H:i:s"));
+				}
 			}else{
 				$model = Purchase::where(DB::raw("SHA1(id)"), $key);
 				$poId = $model->get()->first()->id;
@@ -211,7 +173,7 @@ class PurchaseController extends Controller
 					"close" => 0,
 				]);
 				$po = Purchase::find($poId);
-				$po->saveOrders($poId, $detail_id, $product_codes, $qtys, $prices, $units, $discount, $subtotals, $ppn, auth()->user()->id, explode(",", $remove_products));
+				$po->saveOrders($poId, $detail_id, $product_ids, $qtys, $prices, $units, $discount, $subtotals, $ppn, auth()->user()->id, explode(",", $remove_products));
 			}
 			$response["payload"] = sha1($poId);
 			DB::commit();
@@ -225,6 +187,7 @@ class PurchaseController extends Controller
 	}
 
 	public function view(Request $request){
+		
 		$response["error_code"] = "000";
     	$response["error_message"] = "ok";
 		try{

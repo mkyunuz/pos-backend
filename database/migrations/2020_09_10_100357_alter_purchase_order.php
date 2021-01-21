@@ -14,10 +14,7 @@ class AlterPurchaseOrder extends Migration
     public function up()
     {
         Schema::table("purchase_order", function(Blueprint $table){
-            $table->date("transaction_date")->nullable()->after("shipping_costs");
-        });
-        Schema::table("purchase_order_detail", function(Blueprint $table){
-            $table->dropColumn(["shipping_costs"]);
+            // $table->date("transaction_date")->nullable()->after("shipping_costs");
         });
     }
 

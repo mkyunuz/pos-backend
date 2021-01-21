@@ -8,9 +8,11 @@ use App\Categories;
 use App\Models\ProductHasUnit;
 use App\Models\ProductHasSuppliers;
 use App\Models\ProductHasWarehouse;
+use App\Models\StockCard;
 use App\Suppliers;
 use App\Warehouses;
 use App\Units;
+use App\Models\PurchaseDetail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -24,7 +26,6 @@ class Products extends Model
     ];
 
     public static function boot() {
-        parent::boot();
         parent::boot();
        self::deleting(function($product) {
             $product->prices()->each(function($prices) {
@@ -48,7 +49,6 @@ class Products extends Model
 	    	"product_name" => "required",
 	    	"category" => "required",
 	    	"unit" => "required",
-	    	"description" => "required",
 	    	"purchase_price" => "required",
 	    	"status" => "required",
 	    	"barcode" => "required",
@@ -61,16 +61,28 @@ class Products extends Model
     protected $fillable = ["product_name", "product_code", "category", "unit", "description", "purchase_price", "ppn", "status", "remark", "barcode"];
 
     public function prices($select = []){
-    	$data = $this->hasMany(Prices::class, "product", "product_code");
+    	$data = $this->hasMany(Prices::class, "product", "id");
     	return $data;
     }
-
+    public function defaultPrice(){
+        return $this->hasOne(Prices::class, "product", "id")->where("prices.unit", "=", $this->unit)->orderBy(DB::raw("FIELD(price_group, 'umum', 'member')"))->orderBy("qty", "DESC");
+    }
+    public function purchases(){
+        return $this->hasMany(PurchaseDetail::class, "product_id", "id");
+    }
+    public function pricesUnitFilter($select = []){
+    	$data = $this->hasManyThrough(Prices::class, ProductHasUnit::class, "unit_id", "unit", "id", "product_id");
+    	return $data;
+    }
+    public function getBarcode(){
+        return $this->hasOne(ProductHasUnit::class, "product_id", "id")->where("unit_id", $this->unit_id);
+    }
 	public function categories($select = []){
 	    	return $this->belongsTo(Categories::class, "category", "category_id");
 	}
 
     public function productConversions($select = []){
-    	$data = $this->hasMany(ProductHasUnit::class, "product_id", "id");
+    	$data = $this->hasMany(ProductHasUnit::class, "product_id", "id")->where("default_unit", "!=", 1);
     	return $data;
     }
     public function suppliers(){
@@ -136,6 +148,44 @@ class Products extends Model
        }
        return [];
     }
+
+    public function updateStock($products = [], $units= [], $qtys = [], $warehouse, $transaction_date, $transaction_time){
+    	foreach ($products as $key => $value) {
+    		$product = Products::where(DB::raw("sha1(id)"), $value)->get()->first();
+    		$qty=$qtys[$key];
+    		$productId=$product->id;
+    		if($product){
+    			$hash_default_unit = sha1($product->unit);
+    			if($hash_default_unit != $qtys[$key]){
+    				$unit = ProductHasUnit::where("product_id", $product->id)->where(DB::raw("SHA1(unit_id)"), $units[$key])->get()->first();
+    				$qty = ($unit) ? ($unit->qty * $qty) : $qty;
+    			}
+    		}
+    		// $product->update(["stock" => $]);
+    		if($warehouse){
+    			ProductHasWarehouse::where([
+    				"warehouse_id" => $warehouse,
+    				"product_id" => $productId
+    			])->increment("stock", $qty);
+                $currentStockModel = StockCard::where(["product_id"=>$productId, "warehouse_id" => $warehouse])->orderBy("transaction_date", "desc")->get()->first();
+
+                $currentStock = ($currentStockModel) ? $currentStockModel->qty : 0;
+                StockCard::create([
+                    "warehouse_id" => $warehouse,
+                    "product_id" => $productId,
+                    "type" => "in",
+                    "qty" => $qty,
+                    "stock" => $currentStock + $qty,
+                    "transaction_date" => $transaction_date,
+                    "transaction_time" => $transaction_time,
+                ]);
+    		}
+    	}
+    	// $this->where(DBLL)
+    }
+    
+    
+
     public function saveProductHasWarehouses($productId, $warehouses = []){
 		
 		$data = [];
@@ -176,6 +226,17 @@ class Products extends Model
     	return $this->hasOne(Units::class, "id", "unit");
     }
 
+    public function saveDefaultUnit($unit, $id = null){
+    	if($id){
+    		ProductHasUnit::where([
+    			"unit_id" => $id, 
+    			"product_id" => $unit["product_id"] , 
+    			"default_unit" => 1
+    		])->update(["unit_id" => $unit["unit_id"], "barcode" => $unit["barcode"]]);
+    	}else{
+    		ProductHasUnit::create($unit);
+    	}
+    }
     public function saveProductHasUnits(
     	$productId, 
     	$conversion_id, 
@@ -188,7 +249,7 @@ class Products extends Model
     	$modelHasUnit = [];
 		foreach ($removed_conversions as $rmC => $rmV) ProductHasUnit::where("id", $rmV)->delete();
 		foreach ($conversion_id as $cI => $cV) {
-			ProductHasUnit::where("id", $conversion_id[$cI])
+			ProductHasUnit::where("id", $conversion_id[$cI])->where("default_unit", "!=", 1)
 				->update([
 					"unit_id" => $conversion_units[$cI],
 					"qty" => str_replace(",", "", $conversion_qty[$cI]),

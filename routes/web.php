@@ -14,7 +14,7 @@
 Route::get('/', function () {
     return view('welcome');
 });
-
+Route::get("/customers", "CustomerController@index");
 Auth::routes();
 
 Route::get('/home', 'HomeController@index')->name('home');
@@ -34,6 +34,7 @@ Route::prefix("po")->group(function(){
 
 Route::prefix("journals")->group(function(){
 		Route::get("/", "PurchaseController@journal");
+		Route::get("/bukubesar", "JournalController@bukubesar");
 		// Route::post("/", "ProductsController@index");
 		// Route::post("/save", "PoController@save");
 		// Route::post("/update", "ProductsController@save");
@@ -42,3 +43,15 @@ Route::prefix("journals")->group(function(){
 		// Route::get("/check-id", "ProductsController@checkProductId");
 		// Route::get("/check-barcode", "ProductsController@checkBarcode");
 	});
+
+Route::prefix("pos")->group(function(){
+	Route::get("/products", "PosController@products");
+	Route::get("/summary", "PosController@summary");
+});
+Route::prefix("products")->group(function(){
+	Route::get("/hpp", "ProductsController@hpp");
+});
+
+Route::prefix("ar")->group(function(){
+	Route::get("/", "AccountReceivableController@index");
+});

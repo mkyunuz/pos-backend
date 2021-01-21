@@ -17,9 +17,6 @@ use Illuminate\Validation\Rule;
 
 class ProductsController extends Controller
 {
-	public function __construct(){
-
-	}
     public function index(Request $request){
     	$response["error_code"] = "000";
     	$response["error_message"] = "ok";
@@ -63,12 +60,6 @@ class ProductsController extends Controller
 
    
     public function save(Request $request){
-    	// $a = $this->myfunction([["id" => 1], ["id" => 2]], "id" , 1);
-    	// print_r($a);
-    	// return $a;
-    	// $w = ProductHasWarehouse::where(DB::raw("sha1(warehouse_id)"), "1b6453892473a467d07372d45eb05abc2031647a")
-    							// ->where("product_id", 75)->get()->first();
-// return ($w);
     	$response["error_code"] = "000";
     	$response["error_message"] = "ok";
     	$key = $request->key ?? null;
@@ -111,7 +102,16 @@ class ProductsController extends Controller
 	    			"barcode" => $request->barcode,
 	    		]);
 	    		$productId = $model->id;
-	    		$model->savePrices($model->product_code, $price_group_id, $groups, $qtys, $units, $prices, $removed_price);
+	    		// DB::rollBack();
+	    		// return $productId;
+	    		$model->savePrices($productId, $price_group_id, $groups, $qtys, $units, $prices, $removed_price);
+	    		$model->saveDefaultUnit([
+	    			"product_id" => $productId,
+	    			"unit_id" => $request->unit,
+	    			"qty" => 1,
+	    			"barcode" => $request->barcode,
+	    			"default_unit" => 1,
+	    		]);
 	    		$model->saveProductHasUnits($productId, $conversion_id, $conversion_units, $conversion_qty, $conversion_barcode, $removed_conversions);
 	    		$model->saveSuppliers($productId, $suppliers);
 	    		$model->saveProductHasWarehouses($productId, $warehouses);
@@ -130,7 +130,9 @@ class ProductsController extends Controller
 	    		$status = 200;
 	    		$_key  = $key;
 	    		$model = Products::where(DB::raw("SHA1(id)") , $key);
-	    		$productId = $model->get()->first()->id;
+	    		$modelDdata = $model->get()->first();
+	    		$productId = $modelDdata->id;
+	    		$currentUnitId= $modelDdata->unit;
 	    		$model->update([
 	    			"product_code" => $request->product_code,
 	    			"product_name" => $request->product_name,
@@ -146,7 +148,14 @@ class ProductsController extends Controller
 
 	    		$product = Products::find($productId);
 	    		$product->saveSuppliers($productId, $suppliers);
-	    		$product->savePrices($request->product_code, $price_group_id, $groups, $qtys, $units, $prices, $removed_price);
+	    		$product->savePrices($productId, $price_group_id, $groups, $qtys, $units, $prices, $removed_price);
+	    		$product->saveDefaultUnit([
+	    			"product_id" => $productId,
+	    			"unit_id" => $request->unit,
+	    			"qty" => 1,
+	    			"barcode" => $request->barcode,
+	    			"default_unit" => 1,
+	    		], $currentUnitId);
 	    		$product->saveProductHasUnits($productId, $conversion_id, $conversion_units, $conversion_qty, $conversion_barcode, $removed_conversions);
 	    		$product->saveProductHasWarehouses($productId, $warehouses);
 	    		$response["payload"] = $_key;
@@ -206,6 +215,10 @@ class ProductsController extends Controller
     	}
 
 		return response()->json($response, $status)->withHeaders(['Content-Type' => "application/json"]);
+    }
+    
+    public function hpp(){
+        return ProductRepo::getHpp(1);
     }
 
     public function checkProductId(Request $request){

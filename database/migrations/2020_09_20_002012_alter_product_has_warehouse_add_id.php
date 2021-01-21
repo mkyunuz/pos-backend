@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
-class AlterPurchaseOrder extends Migration
+class AlterProductHasWarehouseAddId extends Migration
 {
     /**
      * Run the migrations.
@@ -13,8 +13,8 @@ class AlterPurchaseOrder extends Migration
      */
     public function up()
     {
-        Schema::table("purchase_order", function(Blueprint $table){
-            $table->float("shipping_costs", 18,2)->after("payment_method");
+        Schema::table("product_has_warehouse", function(Blueprint $table){
+            $table->increments("id");
         });
     }
 
